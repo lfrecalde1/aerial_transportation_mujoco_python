@@ -44,6 +44,8 @@ class MuJoCoSimulationNode(Node):
                  # Section to guarantee same sample times
                 while (time.time() - tic <= self.model.opt.timestep):
                     None
+                toc = time.time() - tic
+                print(toc)
 
     def check_simulation_status(self):
         # Check if the simulation thread is still alive
