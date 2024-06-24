@@ -8,6 +8,7 @@ import time
 import mujoco
 import mujoco.viewer
 from nav_msgs.msg import Odometry
+from mujoco_msgs.msg import Control
 
 class MuJoCoSimulationNode(Node):
     def __init__(self, param):
@@ -22,13 +23,19 @@ class MuJoCoSimulationNode(Node):
         self.name = "root_drone"
         
         # Set initial states 
-        init_position = np.array([1.0, 1.0, 2.0, 1.0, 0.0, 0.0, 0.0])
+        init_position = np.array([1.0, 1.0, 3.0, 0.92, 0.0, 0.0, -0.38])
         self.set_states(init_position)
+
+        # Hover Control Actions
+        self.f = 9.81 + 0.5*9.81
+        self.mx = 0.0
+        self.my = 0.0
+        self.mz = 0.0
 
 
         # Defintion of the sample time
         self.ts = self.model.opt.timestep
-        self.t_final = 60
+        self.t_final = 160
         self.t = np.arange(0, self.t_final + self.ts, self.ts, dtype =np.double)
 
         # Create states Publishe
@@ -38,6 +45,9 @@ class MuJoCoSimulationNode(Node):
         self.odometry_hz = 150
         self.timer_odometry = self.create_timer(1.0 / self.odometry_hz, self.callback_odometry)
 
+        # Subscriber control action
+        self.subscriber_ = self.create_subscription(Control, "cmd", self.callback_control_value, 10)
+
         # Create a thread to run the simulation and viewer
         self.simulation_thread = threading.Thread(target=self.run_simulation)
         # Start thread for the simulation
@@ -46,8 +56,6 @@ class MuJoCoSimulationNode(Node):
         # Create a timer to periodically check the simulation status
         self.timer = self.create_timer(0.05, self.check_simulation_status)
 
-
-
     def run_simulation(self):
         with mujoco.viewer.launch_passive(self.model, self.data) as viewer:
             # Close the viewer automatically after 30 wall-seconds.
@@ -55,10 +63,14 @@ class MuJoCoSimulationNode(Node):
                 if not viewer.is_running():
                     print("Viewer has stopped running")
                     break
-                
                 tic = time.time()
-                
                 # Control Section update section
+                # Set initial control action
+                self.data.ctrl[0] = self.f
+                self.data.ctrl[1] = self.mx
+                self.data.ctrl[2] = self.my
+                self.data.ctrl[3] = self.mz
+
 
                 # mj_step can be replaced with code that also evaluates
                 mujoco.mj_step(self.model, self.data)
@@ -94,16 +106,12 @@ class MuJoCoSimulationNode(Node):
         joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, self.name)
         joint_qposadr = self.model.jnt_qposadr[joint_id]
         x = self.data.qpos[joint_qposadr:joint_qposadr+7]
+
+        # Get information from the sensors
         p_noise = self.data.sensor("drone_position").data.copy()
         q_noise = self.data.sensor("drone_quat").data.copy()
-        print(x.shape)
-        print(x[0], p_noise[0])
-        print(x[1], p_noise[1])
-        print(x[2], p_noise[2])
-        print(x[3], q_noise[0])
-        print(x[4], q_noise[1])
-        print(x[5], q_noise[2])
-        print(x[6], q_noise[3])
+        p_dot_noise = self.data.sensor("drone_linear_velocity").data.copy()
+        w_noise = self.data.sensor("drone_angular_velocity").data.copy()
 
         # setting the values to the message
         self.odometry_msg.header.frame_id = "map"
@@ -117,6 +125,14 @@ class MuJoCoSimulationNode(Node):
         self.odometry_msg.pose.pose.orientation.y = q_noise[2]
         self.odometry_msg.pose.pose.orientation.z = q_noise[3]
         self.odometry_msg.pose.pose.orientation.w = q_noise[0]
+
+        self.odometry_msg.twist.twist.linear.x = p_dot_noise[0]
+        self.odometry_msg.twist.twist.linear.y = p_dot_noise[1]
+        self.odometry_msg.twist.twist.linear.z = p_dot_noise[2]
+
+        self.odometry_msg.twist.twist.angular.x = w_noise[0]
+        self.odometry_msg.twist.twist.angular.y = w_noise[1]
+        self.odometry_msg.twist.twist.angular.z = w_noise[2]
 
         # Send Message
         self.publisher_.publish(self.odometry_msg)
@@ -133,6 +149,17 @@ class MuJoCoSimulationNode(Node):
         self.data.ctrl[1] = 0.0
         self.data.ctrl[2] = 0.0
         self.data.ctrl[3] = 0.0
+        return None
+
+    def callback_control_value(self, msg):
+        fz = msg.thrust
+        mx = msg.torque_x
+        my = msg.torque_y
+        mz = msg.torque_z
+        self.f = fz
+        self.mx = mx
+        self.my = my
+        self.mz = mz
         return None
 
 def main(args=None):
