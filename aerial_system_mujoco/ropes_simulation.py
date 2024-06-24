@@ -1,7 +1,7 @@
-import sys
+#!/usr/bin/env python3
 import rclpy
+import sys
 import mujoco
-from mujoco import MjViewer
 def main(args=None):
     rclpy.init(args=args)
 
