@@ -88,12 +88,10 @@
     <gyro name="drone_angular_velocity" site="imu" noise="0.00"/>
     <accelerometer name="drone_linacc" site="imu" noise="0.00"/>
 </sensor>
-<!--
     <tendon>
         <spatial name="rope1" range="0 2">
             <site site="payload_point_drone"/>
             <site site="payload_point"/>
         </spatial>
     </tendon>
-    -->
 </mujoco>

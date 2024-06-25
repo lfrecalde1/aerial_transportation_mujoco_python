@@ -7,7 +7,9 @@ import threading
 import time
 import mujoco
 import mujoco.viewer
+from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
+import tf2_ros
 from mujoco_msgs.msg import Control
 
 class MuJoCoSimulationNode(Node):
@@ -39,8 +41,8 @@ class MuJoCoSimulationNode(Node):
         
 
         # Hover Control Actions
-        #self.f = self.g * self.mass_drone + self.g*self.mass_payload
-        self.f = self.g * self.mass_drone 
+        self.f = self.g * self.mass_drone + self.g*self.mass_payload
+        #self.f = self.g * self.mass_drone 
         #self.f = 0.0
         self.mx = 0.0
         self.my = 0.0
@@ -59,6 +61,7 @@ class MuJoCoSimulationNode(Node):
         self.odometry_hz = 150
         self.timer_odometry = self.create_timer(1.0 / self.odometry_hz, self.callback_odometry)
 
+        # Publisher payload odometry
         self.publisherpayload_ = self.create_publisher(Odometry, "load", 10)
         self.odometry_msg_payload = Odometry()
         self.odometry_hz_load = 150
@@ -129,7 +132,7 @@ class MuJoCoSimulationNode(Node):
         w_noise = self.data.sensor("drone_angular_velocity").data.copy()
 
         # setting the values to the message
-        self.odometry_msg.header.frame_id = "map"
+        self.odometry_msg.header.frame_id = "world"
         self.odometry_msg.header.stamp = self.get_clock().now().to_msg()
 
         self.odometry_msg.pose.pose.position.x = p_noise[0]
@@ -161,7 +164,7 @@ class MuJoCoSimulationNode(Node):
 
 
         # setting the values to the message
-        self.odometry_msg_payload.header.frame_id = "map"
+        self.odometry_msg_payload.header.frame_id = "world"
         self.odometry_msg_payload.header.stamp = self.get_clock().now().to_msg()
 
         self.odometry_msg_payload.pose.pose.position.x = x[0]
@@ -205,6 +208,7 @@ class MuJoCoSimulationNode(Node):
         self.my = my
         self.mz = mz
         return None
+
 
 def main(args=None):
     rclpy.init(args=args)
