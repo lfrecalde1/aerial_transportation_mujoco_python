@@ -20,14 +20,28 @@ class MuJoCoSimulationNode(Node):
         self.data = mujoco.MjData(self.model)
 
         # Name body drone
-        self.name = "root_drone"
+        self.name_drone = "drone"
+        self.name_payload = "payload_ball"
         
         # Set initial states 
-        init_position = np.array([1.0, 1.0, 3.0, 0.92, 0.0, 0.0, -0.38])
-        self.set_states(init_position)
+        init_pose = np.array([1.0, 1.0, 3.0, 0.93, 0.0, 0.0, -0.34])
+        init_pose_payload = np.array([1.0, 1.0, 1.0, 1, 0.0, 0.0, 0])
+        self.set_states(init_pose)
+        self.set_payload(init_pose_payload)
+
+        # get Parameters of the system
+        mass_drone_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, self.name_drone)
+        mass_payload_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, self.name_payload)
+
+        self.g = -self.model.opt.gravity[2]
+        self.mass_drone = self.model.body_mass[mass_drone_id]
+        self.mass_payload = self.model.body_mass[mass_payload_id]
+        
 
         # Hover Control Actions
-        self.f = 9.81 + 0.5*9.81
+        #self.f = self.g * self.mass_drone + self.g*self.mass_payload
+        self.f = self.g * self.mass_drone 
+        #self.f = 0.0
         self.mx = 0.0
         self.my = 0.0
         self.mz = 0.0
@@ -35,7 +49,7 @@ class MuJoCoSimulationNode(Node):
 
         # Defintion of the sample time
         self.ts = self.model.opt.timestep
-        self.t_final = 160
+        self.t_final = 200
         self.t = np.arange(0, self.t_final + self.ts, self.ts, dtype =np.double)
 
         # Create states Publishe
@@ -44,6 +58,11 @@ class MuJoCoSimulationNode(Node):
         self.odometry_msg = Odometry()
         self.odometry_hz = 150
         self.timer_odometry = self.create_timer(1.0 / self.odometry_hz, self.callback_odometry)
+
+        self.publisherpayload_ = self.create_publisher(Odometry, "load", 10)
+        self.odometry_msg_payload = Odometry()
+        self.odometry_hz_load = 150
+        self.timer_odometry_load = self.create_timer(1.0 / self.odometry_hz_load, self.callback_odometry_load)
 
         # Subscriber control action
         self.subscriber_ = self.create_subscription(Control, "cmd", self.callback_control_value, 10)
@@ -64,6 +83,9 @@ class MuJoCoSimulationNode(Node):
                     print("Viewer has stopped running")
                     break
                 tic = time.time()
+                # Apply veloicites inertial frame
+                #self.data.qvel[0] = -0.1
+                #self.data.qvel[1] = 0.1
                 # Control Section update section
                 # Set initial control action
                 self.data.ctrl[0] = self.f
@@ -94,16 +116,9 @@ class MuJoCoSimulationNode(Node):
             rclpy.shutdown()
         return None
 
-    def set_body_position_by_name(self, body_name, new_position):
-        body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, body_name)
-        if body_id == -1:
-            raise ValueError(f"Body with name {body_name} not found")
-        self.data.qpos[self.model.jnt_qposadr[self.model.body_jntadr[body_id]]] = new_position
-        return None
-
     def callback_odometry(self):
         # Acces states of the drone
-        joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, self.name)
+        joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, self.name_drone)
         joint_qposadr = self.model.jnt_qposadr[joint_id]
         x = self.data.qpos[joint_qposadr:joint_qposadr+7]
 
@@ -138,9 +153,32 @@ class MuJoCoSimulationNode(Node):
         self.publisher_.publish(self.odometry_msg)
         return None 
         
+    def callback_odometry_load(self):
+        # Acces states of the drone
+        joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, self.name_payload)
+        joint_qposadr = self.model.jnt_qposadr[joint_id]
+        x = self.data.qpos[joint_qposadr:joint_qposadr+7]
+
+
+        # setting the values to the message
+        self.odometry_msg_payload.header.frame_id = "map"
+        self.odometry_msg_payload.header.stamp = self.get_clock().now().to_msg()
+
+        self.odometry_msg_payload.pose.pose.position.x = x[0]
+        self.odometry_msg_payload.pose.pose.position.y = x[1]
+        self.odometry_msg_payload.pose.pose.position.z = x[2]
+
+        self.odometry_msg_payload.pose.pose.orientation.x = x[4]
+        self.odometry_msg_payload.pose.pose.orientation.y = x[5]
+        self.odometry_msg_payload.pose.pose.orientation.z = x[6]
+        self.odometry_msg_payload.pose.pose.orientation.w = x[3]
+
+        # Send Message
+        self.publisherpayload_.publish(self.odometry_msg_payload)
+        return None 
         
     def set_states(self, init_position):
-        joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, self.name)
+        joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, self.name_drone)
         joint_qposadr = self.model.jnt_qposadr[joint_id]
         self.data.qpos[joint_qposadr:joint_qposadr+7] = init_position
 
@@ -149,6 +187,12 @@ class MuJoCoSimulationNode(Node):
         self.data.ctrl[1] = 0.0
         self.data.ctrl[2] = 0.0
         self.data.ctrl[3] = 0.0
+        return None
+        
+    def set_payload(self, init_position):
+        joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, self.name_payload)
+        joint_qposadr = self.model.jnt_qposadr[joint_id]
+        self.data.qpos[joint_qposadr:joint_qposadr+7] = init_position
         return None
 
     def callback_control_value(self, msg):
@@ -164,24 +208,22 @@ class MuJoCoSimulationNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
+
     # We check for at least one argument in this node
     if len(sys.argv) < 2:
         print("Usage: ros2 run my_ros2_package my_ros2_node.py <param1>")
         return
-
     param1 = sys.argv[1]
     node = MuJoCoSimulationNode(param1)
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)  # Will run until manually interrupted
+    except KeyboardInterrupt:
+        node.get_logger().info('Simulation stopped manually.')
+        rclpy.shutdown()
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+    return None
 
 if __name__ == '__main__':
-    try:
-        main()
-    except(KeyboardInterrupt):
-        print("Error system")
-        pass
-    else:
-        print("Complete Execution")
-        pass
-    
+    main()
