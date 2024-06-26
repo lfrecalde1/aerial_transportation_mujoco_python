@@ -65,9 +65,13 @@
 
     <!-- Payloy only in xyz axis -->
     <body name="payload_ball" pos="1 1 1">
-      <joint name="payload_ball" pos="0 0 0" type="free" damping="0.0003"/>
-      <geom name="payload_ball" size="0.03" type="sphere" rgba="1 1 1 1" mass="0.15" friction="1.0 0.005 0.0001"/>
-      <site name="payload_point" pos="0.0 0.0 0.03"/>
+      <joint name="payload_ball" pos="0 0 0" type="free" damping="0.01"/>
+      <geom name="payload_ball" size="0.04" type="sphere" rgba="0 0 0 0.8" mass="0.15" friction="1.0 0.005 0.0001"/>
+      <site name="payload_point" pos="0.0 0.0 0.04"/>
+      <!--  Representation of the body frame   -->
+      <site name="load_X" type="box" pos="0.05 0.0 0.0" size="0.05 0.005 0.005" quat=" 1.0 0.0 0.0 0." rgba="1 0 0 1"/>
+      <site name="load_Y" type="box" pos="0.0 0.05 0.0" size="0.05 0.005 0.005" quat=" 0.707 0.0 0.0 0.707" rgba="0 1 0 1"/>
+      <site name="load_Z" type="box" pos="0.0 0.0 0.05" size="0.05 0.005 0.005" quat="-0.707 0.0 0.707 0." rgba="0 0 1 1"/>
     </body>
 
   </worldbody>
@@ -76,9 +80,9 @@
       <!--  Actuators of the system   -->
 <actuator>
     <motor ctrllimited="true" ctrlrange="0 20.0" gear="0 0. 1. 0. 0. 0." site="thrust" name="body_thrust"/>
-    <motor ctrllimited="true" ctrlrange="-5 5" gear="0. 0. 0. 1. 0. 0." site="rateX" name="x_moment"/>
-    <motor ctrllimited="true" ctrlrange="-5 5" gear="0. 0. 0. 0. 1. 0." site="rateY" name="y_moment"/>
-    <motor ctrllimited="true" ctrlrange="-5 5" gear="0. 0. 0. 0. 0. 1." site="rateZ" name="z_moment"/>
+    <motor ctrllimited="true" ctrlrange="-1 1" gear="0. 0. 0. 1. 0. 0." site="rateX" name="x_moment"/>
+    <motor ctrllimited="true" ctrlrange="-1 1" gear="0. 0. 0. 0. 1. 0." site="rateY" name="y_moment"/>
+    <motor ctrllimited="true" ctrlrange="-1 1" gear="0. 0. 0. 0. 0. 1." site="rateZ" name="z_moment"/>
 </actuator>
 
 <sensor>

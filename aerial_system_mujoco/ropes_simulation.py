@@ -12,7 +12,7 @@ def main(args=None):
 
     param1 = sys.argv[1]
     model = mujoco.MjModel.from_xml_path(param1)
-
+ # type: ignore
     # Print names of the geometrical objects in the xml file
     geometric_names = [] 
     body_names = [] 

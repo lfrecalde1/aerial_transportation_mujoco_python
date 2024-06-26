@@ -7,19 +7,21 @@ import threading
 import time
 import mujoco
 import mujoco.viewer
-from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
-import tf2_ros
 from mujoco_msgs.msg import Control
-
+ # type: ignore # type: ignore
 class MuJoCoSimulationNode(Node):
+
     def __init__(self, param):
         super().__init__('mujoco_simulation_node')
-
         # Load the MuJoCo model and data
         self.model = mujoco.MjModel.from_xml_path(param)
         # Create the infomation for the simulation
         self.data = mujoco.MjData(self.model)
+
+        self.cameras = self.model.camera
+        self.width= 1080
+        self.height = 1920
 
         # Name body drone
         self.name_drone = "drone"
@@ -39,7 +41,6 @@ class MuJoCoSimulationNode(Node):
         self.mass_drone = self.model.body_mass[mass_drone_id]
         self.mass_payload = self.model.body_mass[mass_payload_id]
         
-
         # Hover Control Actions
         self.f = self.g * self.mass_drone + self.g*self.mass_payload
         #self.f = self.g * self.mass_drone 
@@ -47,7 +48,6 @@ class MuJoCoSimulationNode(Node):
         self.mx = 0.0
         self.my = 0.0
         self.mz = 0.0
-
 
         # Defintion of the sample time
         self.ts = self.model.opt.timestep
@@ -79,7 +79,7 @@ class MuJoCoSimulationNode(Node):
         self.timer = self.create_timer(0.05, self.check_simulation_status)
 
     def run_simulation(self):
-        with mujoco.viewer.launch_passive(self.model, self.data) as viewer:
+        with mujoco.viewer.launch_passive(self.model, self.data, show_right_ui=False, show_left_ui=False) as viewer:
             # Close the viewer automatically after 30 wall-seconds.
             for k in range(0, self.t.shape[0]):
                 if not viewer.is_running():
@@ -102,13 +102,19 @@ class MuJoCoSimulationNode(Node):
 
                 # Example modification of a viewer option: toggle contact points every two seconds.
                 with viewer.lock():
+                    cam_id = viewer.cam.type  # Current camera type
+                    viewer.cam.lookat[:]  = [7.48444245e-01,  -4.58289934e-17,  2.29722401e+00]
+                    viewer.cam.distance  = 9.436468821565647
+                    viewer.cam.azimuth = 79.72440944881889
+                    viewer.cam.elevation  = -39.68503937007874
+
                     viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = int(self.data.time % 2)
                 # Pick up changes to the physics state, apply perturbations, update options from GUI.
                 viewer.sync()
 
                 # Section to guarantee same sample times
                 while (time.time() - tic <= self.model.opt.timestep):
-                    None
+                    pass
                 toc = time.time() - tic
                 #print(toc)
 
@@ -217,12 +223,14 @@ def main(args=None):
     if len(sys.argv) < 2:
         print("Usage: ros2 run my_ros2_package my_ros2_node.py <param1>")
         return
+
     param1 = sys.argv[1]
     node = MuJoCoSimulationNode(param1)
     try:
         rclpy.spin(node)  # Will run until manually interrupted
     except KeyboardInterrupt:
         node.get_logger().info('Simulation stopped manually.')
+        node.destroy_node()
         rclpy.shutdown()
     finally:
         node.destroy_node()
