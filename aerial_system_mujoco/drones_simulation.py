@@ -79,7 +79,7 @@ class MuJoCoSimulationNode(Node):
         self.timer = self.create_timer(0.05, self.check_simulation_status)
 
     def run_simulation(self):
-        with mujoco.viewer.launch_passive(self.model, self.data, show_right_ui=False, show_left_ui=False) as viewer:
+        with mujoco.viewer.launch_passive(self.model, self.data, show_right_ui=False, show_left_ui=True) as viewer:
             # Close the viewer automatically after 30 wall-seconds.
             for k in range(0, self.t.shape[0]):
                 if not viewer.is_running():
